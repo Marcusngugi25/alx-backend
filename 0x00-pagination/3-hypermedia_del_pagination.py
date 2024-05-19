@@ -4,8 +4,7 @@ Deletion-resilient hypermedia pagination
 """
 
 import csv
-import math
-from typing import List, Dict
+from typing import Dict, List
 
 
 class Server:
@@ -19,6 +18,9 @@ class Server:
 
     def dataset(self) -> List[List]:
         """Cached dataset
+
+        Returns:
+            List[List]: The list of rows representing the dataset.
         """
         if self.__dataset is None:
             with open(self.DATA_FILE) as f:
@@ -29,7 +31,11 @@ class Server:
         return self.__dataset
 
     def indexed_dataset(self) -> Dict[int, List]:
-        """Dataset indexed by sorting position, starting at 0
+        """Dataset indexed by sorting position, starting at 0.
+
+        Returns:
+            Dict[int, List]: The list of rows representing the dataset starting
+            at 0.
         """
         if self.__indexed_dataset is None:
             dataset = self.dataset()
@@ -40,23 +46,41 @@ class Server:
         return self.__indexed_dataset
 
     def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
-        # Check if index is within the range of dataset
-        assert index in range(len(self.dataset()))
-        index_dict = self.indexed_dataset()
+        """Retrieves a specific page of the dataset of popular baby names by
+        index.
 
-        # Check if index is 0 and page_size is 10
-        if index == 0 and page_size == 10:
-            # Get the first 10 elements from index_dict
-            data = index_dict[0:10]
-        elif index is None:  # Check if index is None
-            index = index  # Assign index to itself (redundant statement?)
-        # Get the data at the given index from index_dict,
-        # or None if index is not present
-        data = [index_dict[index] if index in index_dict else None]
+        Args:
+            index (int, optional): the index of the first item in the page to
+            retrieve.
+            If None, it defaults to the first item in the dataset.
+            page_size (int, optional): the number of items per page. Defaults
+            to 10.
 
-        return {
-            "index": index,  # Return the index
-            "next_index": index + 1,  # Return the next index
-            "page_size": page_size,  # Return the page size
-            "data": data  # Return the data
+        Returns:
+            Dict: A dictionary containing the following key-value pairs:
+                index (int): the current start index of the return page.
+                next_index (int): the next index to query with.
+                page_size (int): the current page size
+                data (List[List]): the actual page of the dataset
+        """
+        data = self.indexed_dataset()
+        assert index is not None and index >= 0 and index <= max(data.keys())
+        page_data = []
+        data_count = 0
+        next_index = None
+        start = index if index else 0
+        for i, item in data.items():
+            if i >= start and data_count < page_size:
+                page_data.append(item)
+                data_count += 1
+                continue
+            if data_count == page_size:
+                next_index = i
+                break
+        page_info = {
+            'index': index,
+            'next_index': next_index,
+            'page_size': len(page_data),
+            'data': page_data,
         }
+        return page_info
